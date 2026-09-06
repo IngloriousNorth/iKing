@@ -1026,14 +1026,64 @@ function numberToLeggeToss(num) {
     return 9;                   // 1/8 chance (3 Heads -> Old Yang)
 }
 
-async function fetchQuantumNumber() {
+async function fetchQuantumNumbers() {
     const response = await fetch(PROXY_URL);
     if (!response.ok) throw new Error("Quantum API network error");
     const json = await response.json();
-    const val = json.data ? json.data.number : json.number;
-    if (val === undefined || val === null) throw new Error("Invalid payload format");
-    return Number(val);
+    
+    // Expecting an array under json.data, json.numbers, or root array
+    const numbers = json.data || json.numbers || json;
+    
+    if (!Array.isArray(numbers) || numbers.length < 6) {
+        throw new Error("Invalid array payload returned from API");
+    }
+    return numbers.map(Number);
 }
+
+async function performDivination() {
+    const statusEl = document.getElementById('status');
+    const castBtn = document.getElementById('castBtn');
+    castBtn.disabled = true;
+
+    const tosses = [];
+    const quantumValues = [];
+
+    try {
+        statusEl.innerText = "Consulting Quantum Oracle for 6 lines...";
+        
+        let fetchedNumbers;
+        try {
+            fetchedNumbers = await fetchQuantumNumbers();
+        } catch (err) {
+            // Fallback: Generate 6 cryptographically secure random values locally
+            const randArr = new Uint8Array(6);
+            window.crypto.getRandomValues(randArr);
+            fetchedNumbers = Array.from(randArr);
+        }
+
+        // Sequentially accumulate lines 1-6 using the pre-fetched numbers
+        for (let line = 1; line <= 6; line++) {
+            statusEl.innerText = `Casting Line ${line} of 6...`;
+            
+            const num = fetchedNumbers[line - 1];
+            const toss = numberToLeggeToss(num);
+            
+            tosses.push(toss);
+            quantumValues.push(num);
+            
+            // Brief pause so the UI step-by-step casting accumulation is visible
+            await new Promise(resolve => setTimeout(resolve, 150));
+        }
+
+        statusEl.innerText = "Processing Quantum State...";
+        runDivination(tosses, quantumValues);
+
+    } catch (error) {
+        statusEl.innerText = "Error reading quantum entropy. Try again.";
+        castBtn.disabled = false;
+    }
+}
+    
 
 function renderVisualHexagram(lines, containerId) {
     const container = document.getElementById(containerId);
@@ -1063,39 +1113,6 @@ function renderLinesList(hexData, changingLineNumbers, containerId) {
 
         lineItem.innerHTML = `<span class="line-badge">Line ${i}:</span> "${lineText}"${changingTag}`;
         container.appendChild(lineItem);
-    }
-}
-
-async function performDivination() {
-    const statusEl = document.getElementById('status');
-    const castBtn = document.getElementById('castBtn');
-    castBtn.disabled = true;
-
-    const tosses = [];
-    const quantumValues = [];
-
-    try {
-        for (let line = 1; line <= 6; line++) {
-            statusEl.innerText = `Consulting Quantum Oracle for Line ${line} of 6...`;
-            let num;
-            try {
-                num = await fetchQuantumNumber();
-            } catch (err) {
-                const randArr = new Uint8Array(1);
-                window.crypto.getRandomValues(randArr);
-                num = randArr[0];
-            }
-            const toss = numberToLeggeToss(num);
-            tosses.push(toss);
-            quantumValues.push(num);
-        }
-
-        statusEl.innerText = "Processing Quantum State...";
-        runDivination(tosses, quantumValues);
-
-    } catch (error) {
-        statusEl.innerText = "Error reading quantum entropy. Try again.";
-        castBtn.disabled = false;
     }
 }
 
